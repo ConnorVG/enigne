@@ -1,0 +1,24 @@
+    {
+    "name": "fiiight-logic",
+    "description": "The fiiight logic engine.",
+
+    "authors": [
+        "Connor S. Parks"
+    ],
+
+    "version": "0.0.1",
+
+    "mainSourceFile": "src/package.d",
+    "sourcePaths": ["src"],
+    "importPaths": ["src"],
+
+    "targetType": "library",
+    "targetPath": "bin",
+
+    "copyright": "Copyright © 2016, Connor S. Parks",
+    "license": "proprietary",
+
+    "dependencies": {
+        "fiiight-common": "*"
+    }
+}

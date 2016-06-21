@@ -1,0 +1,24 @@
+{
+	"name": "fiiight-game",
+	"description": "The fiiight game implementation.",
+
+	"authors": [
+		"Connor S. Parks"
+	],
+
+	"version": "0.0.1",
+
+	"sourcePaths": ["src"],
+
+	"targetType": "executable",
+	"targetPath": "bin",
+	
+	"copyright": "Copyright © 2016, Connor S. Parks",
+	"license": "proprietary",
+
+	"dependencies": {
+		"fiiight-common": "*",
+		"fiiight-rendering": "*",
+		"fiiight-logic": "*"
+	}
+}

@@ -1,0 +1,18 @@
+{
+	"name": "fiiight-common",
+	"description": "The fiiight common library.",
+
+	"authors": [
+		"Connor S. Parks"
+	],
+
+	"version": "0.0.1",
+
+	"sourcePaths": ["src"],
+
+	"targetType": "library",
+	"targetPath": "bin",
+	
+	"copyright": "Copyright © 2016, Connor S. Parks",
+	"license": "proprietary"
+}

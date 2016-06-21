@@ -1,0 +1,10 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"derelict-enet": "2.0.0",
+		"derelict-util": "2.0.6",
+		"fiiight-common": "0.0.1",
+		"fiiight-logic": "0.0.1",
+		"fiiight-rendering": "0.0.1"
+	}
+}

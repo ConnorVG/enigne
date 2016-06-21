@@ -1,0 +1,22 @@
+{
+	"name": "fiiight-rendering",
+	"description": "The fiiight rendering engine.",
+
+	"authors": [
+		"Connor S. Parks"
+	],
+
+	"version": "0.0.1",
+
+	"sourcePaths": ["src"],
+
+	"targetType": "library",
+	"targetPath": "bin",
+	
+	"copyright": "Copyright © 2016, Connor S. Parks",
+	"license": "proprietary",
+
+	"dependencies": {
+		"fiiight-common": "*"
+	}
+}
