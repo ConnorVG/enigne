@@ -26,27 +26,23 @@ class LocalConnection : Connection
      * Connect to the server.
      *
      * Params:
-     *      onSuccess  =        the success handler
-     *      onError    =        the error handler
-     *      onPacket   =        the packet handler
+     *      onPacket  =     the packet handler
+     *
+     * Returns: if the connection was successful
      */
-    public override void connect(
-        void delegate(Connection) onSuccess,
-        void delegate(Connection) onError,
-        void delegate(Connection, const Packet packet) onPacket
-    ) {
+    public override bool connect(void delegate(Connection, const Packet) onPacket)
+    {
         this.handler = onPacket;
 
         if (! this.host.connect(this)) {
             this.handler = null;
-            onError(this);
 
-            return;
+            return false;
         }
 
         this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Connected)));
 
-        onSuccess(this);
+        return true;
     }
 
     /**

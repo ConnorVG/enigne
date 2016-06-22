@@ -98,10 +98,21 @@ class Host
      *      address  =      the external address
      *      port     =      the external port
      */
-    public this(const string address = "127.0.0.1", const ushort port = 43594)
+    public this(const string address, const ushort port = 43594)
     {
         this.address = address;
         this.port = port;
+    }
+
+    /**
+     * Construct the host.
+     *
+     * Params:
+     *      port  =     the external port
+     */
+    public this(const ushort port = 43594)
+    {
+        this("127.0.0.1", port);
     }
 
     /**
@@ -109,6 +120,10 @@ class Host
      */
     public void start()
     {
+        if (this.socket) {
+            return;
+        }
+
         this.connections.clear();
         this.connectionsMap.clear();
 
@@ -243,8 +258,10 @@ class Host
                     return;
                 }
 
-                this.pings.remove(uuid);
-                this.pingsMap.remove(connection.id);
+                connection.ping = 1000;
+                this.disconnect(connection, ConnectionError.TimedOut);
+
+                return;
             } else {
                 this.pingsMap.remove(connection.id);
             }
@@ -263,6 +280,10 @@ class Host
      */
     public void stop()
     {
+        if (! this.socket) {
+            return;
+        }
+
         this.disconnect();
 
         this.socket.shutdown(SocketShutdown.BOTH);
@@ -283,6 +304,8 @@ class Host
             }
         }
 
+        this.pings.clear();
+        this.pingsMap.clear();
         this.connections.clear();
         this.connectionsMap.clear();
         this.buffer.clear();
@@ -293,11 +316,19 @@ class Host
      *
      * Params:
      *      connection  =       the connection to disconnect
+     *      error       =       the connection error
      */
-    public void disconnect(Connection connection)
+    public void disconnect(Connection connection, ConnectionError error = ConnectionError.None)
     {
         if (! connection.id.isNull) {
             this.connections.remove(connection.id);
+
+            if (connection.id in this.pingsMap) {
+                auto uuid = this.pingsMap[connection.id];
+
+                this.pings.remove(uuid);
+                this.pingsMap.remove(connection.id);
+            }
         }
 
         if (auto client = cast(ClientConnection) connection) {
@@ -313,7 +344,7 @@ class Host
             return;
         }
 
-        this.onDisconnect(connection, ConnectionError.None);
+        this.onDisconnect(connection, error);
     }
 
     /**
@@ -422,7 +453,7 @@ class Host
 
                     connection.ping = cast(ushort) (now - ping);
 
-                    return;
+                    break;
                 default: break;
             }
         }

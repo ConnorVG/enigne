@@ -8,6 +8,16 @@ import std.parallelism : TaskPool;
 interface IUpdater
 {
     /**
+     * The rate.
+     */
+    public @property float rate();
+
+    /**
+     * The rate base.
+     */
+    public @property float rateBase();
+
+    /**
      * Set the runner.
      *
      * Params:

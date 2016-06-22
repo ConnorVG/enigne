@@ -49,15 +49,12 @@ class RemoteConnection : Connection
      * Connect to the server.
      *
      * Params:
-     *      onSuccess  =        the success handler
-     *      onError    =        the error handler
-     *      onPacket   =        the packet handler
+     *      onPacket  =     the packet handler
+     *
+     * Returns: if the connection was successful
      */
-    public override void connect(
-        void delegate(Connection) onSuccess,
-        void delegate(Connection) onError,
-        void delegate(Connection, const Packet packet) onPacket
-    ) {
+    public override bool connect(void delegate(Connection, const Packet) onPacket)
+    {
         this.socket = new Socket(AddressFamily.INET, SocketType.DGRAM, ProtocolType.UDP);
         this.socket.blocking = true;
 
@@ -71,9 +68,7 @@ class RemoteConnection : Connection
             this.socket.close();
             this.socket = null;
 
-            onError(this);
-
-            return;
+            return false;
         }
 
         this.handler = onPacket;
@@ -81,7 +76,7 @@ class RemoteConnection : Connection
         this.socket.blocking = false;
         this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Connected)));
 
-        onSuccess(this);
+        return true;
     }
 
     /**

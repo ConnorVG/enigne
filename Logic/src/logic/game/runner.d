@@ -4,7 +4,7 @@ import logic.game.state : IState;
 import logic.game.renderer : IRenderer;
 import logic.game.updater : IUpdater;
 
-import std.parallelism : TaskPool;
+import std.parallelism : TaskPool, parallel;
 
 import core.time : MonoTime, Duration, dur;
 import core.thread : Thread;
@@ -17,9 +17,9 @@ class Runner
     protected bool running = false;
 
     /**
-     * The game updater.
+     * The game updaters.
      */
-    protected IUpdater updater;
+    protected IUpdater[] updaters;
 
     /**
      * The game renderer.
@@ -34,16 +34,18 @@ class Runner
      *      updater   =     the game updater
      *      renderer  =     the game renderer
      */
-    public this(IState state, IUpdater updater, IRenderer renderer)
+    public this(IState state, IUpdater[] updaters, IRenderer renderer)
     {
-        this.updater = updater;
+        this.updaters = updaters;
         this.renderer = renderer;
 
-        this.updater.setState(state);
         this.renderer.setState(state);
-
-        this.updater.setRunner(this);
         this.renderer.setRunner(this);
+
+        foreach (ref updater; parallel(this.updaters)) {
+            updater.setState(state);
+            updater.setRunner(this);
+        }
     }
 
     /**
@@ -53,8 +55,10 @@ class Runner
     {
         this.running = true;
 
-        this.updater.onStart();
         this.renderer.onStart();
+        foreach (ref updater; parallel(this.updaters)) {
+            updater.onStart();
+        }
 
         this.run();
     }
@@ -64,53 +68,52 @@ class Runner
      */
     public void run()
     {
-        float updateRateBase = 1000000f / 30;
-        float updateRate = 1000000f / 30;
         float renderRate = 1000000f / 144;
-
-        int updateDelay = 0;
         int renderDelay = 0;
-
-        MonoTime updateBefore = MonoTime.currTime;
         MonoTime renderBefore = MonoTime.currTime;
-        MonoTime now;
 
+        float[] rateBases = [];
+        float[] rates = [];
+        int[] delays = [];
+        MonoTime[] befores = [];
+
+        foreach (ref updater; this.updaters) {
+            rates ~= updater.rate;
+            rateBases ~= updater.rateBase;
+            delays ~= 0;
+            befores ~= MonoTime.currTime;
+        }
+
+        MonoTime now;
         Duration elapsed;
         long elapsedTotal;
 
-        TaskPool taskPool;
-
-        debug {
-            float total = 0f;
-        }
+        TaskPool taskPool = new TaskPool();
+        taskPool.isDaemon = true;
 
         while (this.running) {
-            now = MonoTime.currTime;
-            elapsed = now - updateBefore;
-            elapsedTotal = elapsed.total!"usecs";
-            updateBefore = now;
+            int delay = -1000000;
 
-            updateDelay += elapsedTotal;
-            if (updateDelay >= -1) {
-                float updateTick = updateRate / updateRateBase;
+            foreach (int id, ref updater; this.updaters) {
+                now = MonoTime.currTime;
+                elapsed = now - befores[id];
+                elapsedTotal = elapsed.total!"usecs";
+                befores[id] = now;
 
-                if (updateDelay > 0) {
-                    updateTick += (updateDelay / updateRate) / updateRateBase;
-                }
+                delays[id] += elapsedTotal;
+                if (delays[id] >= -1) {
+                    float tick = rates[id] / rateBases[id];
 
-                debug {
-                    total += updateTick;
-
-                    if (total >= 5) {
-                        this.stop();
+                    if (delays[id] > 0) {
+                        tick += (delays[id] / rates[id]) / rateBases[id];
                     }
+
+                    updater.run(taskPool, tick);
+
+                    delays[id] = cast(int) -rates[id];
                 }
 
-                taskPool = new TaskPool();
-
-                this.updater.run(taskPool, updateTick);
-
-                updateDelay = cast(int) -updateRate;
+                delay = delays[id] > delay ? delays[id] : delay;
             }
 
             now = MonoTime.currTime;
@@ -124,15 +127,8 @@ class Runner
 
                 renderDelay = cast(int) -renderRate;
             }
+            delay = renderDelay > delay ? renderDelay : delay;
 
-            // Not sure if this should just be in the update block or not, honestly.
-            if (taskPool) {
-                taskPool.finish(true);
-
-                taskPool = null;
-            }
-
-            int delay = updateDelay < renderDelay ? renderDelay : updateDelay;
             if (delay < -1) {
                 Thread.sleep(dur!"usecs"(delay * -1));
             }
@@ -154,7 +150,10 @@ class Runner
      */
     protected void onStop()
     {
-        this.updater.onStop();
+        foreach (ref updater; parallel(this.updaters)) {
+            updater.onStop();
+        }
+
         this.renderer.onStop();
     }
 }

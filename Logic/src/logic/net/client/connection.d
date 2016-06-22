@@ -7,6 +7,7 @@ import std.typecons : Nullable;
 enum ConnectionError {
     None,
     Unknown,
+    TimedOut,
 }
 
 abstract class Connection
@@ -30,15 +31,11 @@ abstract class Connection
      * Connect to the server.
      *
      * Params:
-     *      onSuccess  =        the success handler
-     *      onError    =        the error handler
-     *      onPacket   =        the packet handler
+     *      onPacket  =     the packet handler
+     *
+     * Returns: if the connection was successful
      */
-    public abstract void connect(
-        void delegate(Connection) onSuccess,
-        void delegate(Connection) onError,
-        void delegate(Connection, const Packet) onPacket
-    );
+    public abstract bool connect(void delegate(Connection, const Packet) onPacket);
 
     /**
      * Process the connection.
