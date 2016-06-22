@@ -1,6 +1,7 @@
-module fiiight.game.renderer;
+module game.renderer;
 
-import fiiight.game.state : State;
+import game.state : State;
+
 import fiiight.logic : IRenderer, Runner, IState;
 
 debug import std.stdio : writeln;

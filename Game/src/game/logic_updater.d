@@ -1,6 +1,7 @@
-module fiiight.game.logic;
+module game.logic_updater;
 
-import fiiight.game.state : State;
+import game.state : State;
+
 import fiiight.logic : IUpdater, Runner, IState, Connection, LocalConnection, Packet;
 
 import std.parallelism : TaskPool, task;
@@ -41,18 +42,6 @@ class LogicUpdater : IUpdater
     protected State state;
 
     /**
-     * The local net connection.
-     */
-    protected Connection connection;
-
-    debug {
-        /**
-         * The remote net connection.
-         */
-        protected Connection remote;
-    }
-
-    /**
      * Set the runner.
      *
      * Params:
@@ -83,16 +72,6 @@ class LogicUpdater : IUpdater
     public void onStart()
     {
         debug writeln("LogicUpdater::onStart");
-
-        auto netUpdater = this.state.getNetUpdater();
-
-        this.connection = new LocalConnection(netUpdater.host);
-        this.connection.connect(&this.onPacket);
-
-        debug {
-            this.remote = new RemoteConnection();
-            remote.connect(&this.onPacket);
-        }
     }
 
     /**
@@ -104,11 +83,11 @@ class LogicUpdater : IUpdater
      */
     public void run(TaskPool pool, const float tick)
     {
-        pool.put(task(&this.connection.process));
+        auto netUpdater = this.state.getNetUpdater();
 
-        debug pool.put(task(&this.remote.process));
-
-        // ... update state
+        if (netUpdater) {
+            netUpdater.run(pool, tick, false);
+        }
     }
 
     /**
@@ -117,21 +96,5 @@ class LogicUpdater : IUpdater
     public void onStop()
     {
         debug writeln("LogicUpdater::onStop");
-    }
-
-    /**
-     * Handle a received packet.
-     *
-     * Params:
-     *      connection  =       the connection
-     *      packet      =       the received packet
-     */
-    protected void onPacket(Connection connection, const Packet packet)
-    {
-        debug {
-            if (connection != this.connection) {
-                return;
-            }
-        }
     }
 }

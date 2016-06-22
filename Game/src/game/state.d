@@ -1,8 +1,9 @@
-module fiiight.game.state;
+module game.state;
+
+import game.net_updater : NetUpdater;
+import game.logic_updater : LogicUpdater;
 
 import fiiight.logic : IState;
-import fiiight.game.net : NetUpdater;
-import fiiight.game.logic : LogicUpdater;
 
 class State : IState
 {

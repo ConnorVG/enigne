@@ -5,7 +5,7 @@ import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 import std.socket :
     INADDR_LOOPBACK, InternetAddress, AddressFamily, Socket, SocketType,
-    SocketOptionLevel, SocketOption, ProtocolType;
+    SocketOptionLevel, SocketOption, SocketShutdown, ProtocolType;
 
 import std.array : appender;
 import std.bitmanip : peek, append;
@@ -77,6 +77,22 @@ class RemoteConnection : Connection
         this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Connected)));
 
         return true;
+    }
+
+    /**
+     * Disconnect from the server.
+     */
+    public override void disconnect()
+    {
+        this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));
+
+        if (this.socket && this.socket.isAlive) {
+            this.socket.shutdown(SocketShutdown.BOTH);
+            this.socket.close();
+            this.socket = null;
+        }
+
+        this.handler = null;
     }
 
     /**

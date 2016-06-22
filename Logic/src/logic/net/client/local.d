@@ -46,6 +46,16 @@ class LocalConnection : Connection
     }
 
     /**
+     * Disconnect from the server.
+     */
+    public override void disconnect()
+    {
+        this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));
+
+        this.handler = null;
+    }
+
+    /**
      * Send a packet to the host.
      *
      * Params:

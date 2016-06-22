@@ -1,5 +1,6 @@
+import game : State, NetUpdater, LogicUpdater, Renderer;
+
 import fiiight.logic : LoadLogic = Load, Game = Runner, IUpdater;
-import fiiight.game : State, NetUpdater, LogicUpdater, Renderer;
 
 void main()
 {

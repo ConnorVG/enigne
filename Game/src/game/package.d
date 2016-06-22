@@ -1,8 +1,9 @@
-module fiiight.game;
+module game;
 
 public {
-    import fiiight.game.logic;
-    import fiiight.game.net;
-    import fiiight.game.renderer;
-    import fiiight.game.state;
+    import game.logic_updater;
+    import game.net;
+    import game.net_updater;
+    import game.renderer;
+    import game.state;
 }

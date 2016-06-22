@@ -3,6 +3,7 @@ module logic.net.client.connection;
 import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 import std.typecons : Nullable;
+import std.bitmanip : peek;
 
 enum ConnectionError {
     None,
@@ -36,6 +37,12 @@ abstract class Connection
      * Returns: if the connection was successful
      */
     public abstract bool connect(void delegate(Connection, const Packet) onPacket);
+
+    /**
+     * Disconnect from the server.
+     */
+    public void disconnect()
+    { /** */ }
 
     /**
      * Process the connection.
@@ -78,6 +85,10 @@ abstract class Connection
             switch (packet.header.subType) with (PacketSubType) {
                 case Connection_Ping:
                     this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Pong, packet.header.length), packet.content));
+
+                    break;
+                case Connection_PingUpdate:
+                    this.ping = packet.content.peek!ushort(0);
 
                     break;
                 default: break;

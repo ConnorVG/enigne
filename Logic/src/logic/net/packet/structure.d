@@ -11,6 +11,7 @@ enum PacketSubType : ubyte {
     Connection_Disconnected = 1,
     Connection_Ping = 2,
     Connection_Pong = 3,
+    Connection_PingUpdate = 4,
 }
 
 align(1) struct PacketHeader

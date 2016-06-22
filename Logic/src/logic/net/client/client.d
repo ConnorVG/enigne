@@ -43,7 +43,9 @@ class ClientConnection : Connection
      * Returns: if the connection was successful
      */
     public override bool connect(void delegate(Connection, const Packet) onPacket)
-    { return false; }
+    {
+        return false;
+    }
 
     /**
      * Send a packet to the host.

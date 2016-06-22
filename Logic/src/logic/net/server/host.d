@@ -453,6 +453,11 @@ class Host
 
                     connection.ping = cast(ushort) (now - ping);
 
+                    auto buff = new ubyte[2];
+                    buff.write!ushort(connection.ping, 0);
+
+                    this.send(connection, Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_PingUpdate, cast(ushort) buff.length), buff));
+
                     break;
                 default: break;
             }
