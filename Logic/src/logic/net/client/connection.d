@@ -5,6 +5,7 @@ import logic.net.packet : Packet, PacketHeader;
 import std.typecons : Nullable;
 
 enum ConnectionError {
+    None,
     Unknown,
     RejectedByHost,
 }
@@ -19,7 +20,7 @@ abstract class Connection
     /**
      * The packet handler.
      */
-    protected void delegate(Connection, const Packet packet) handler;
+    protected void delegate(Connection, const Packet) handler;
 
     /**
      * Connect to the server.
@@ -34,6 +35,14 @@ abstract class Connection
         void delegate(Connection, ConnectionError) onError,
         void delegate(Connection, const Packet) onPacket
     );
+
+    /**
+     * Process the connection.
+     */
+    public void process()
+    {
+        // ...
+    }
 
     /**
      * Send a packet to the host.
@@ -53,18 +62,7 @@ abstract class Connection
      */
     public void send(const ushort type, const ubyte subType, const ubyte[] content)
     {
-        PacketHeader header = {
-            type: type,
-            subType: subType,
-            length: content.sizeof
-        };
-
-        Packet packet = {
-            header: header,
-            content: content
-        };
-
-        return this.send(packet);
+        return this.send(Packet(PacketHeader(type, subType, cast(ushort) content.length), content));
     }
 
     /**

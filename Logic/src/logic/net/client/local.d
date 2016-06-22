@@ -2,7 +2,7 @@ module logic.net.client.local;
 
 import logic.net.client.connection : Connection, ConnectionError;
 import logic.net.server : Host;
-import logic.net.packet : Packet;
+import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 class LocalConnection : Connection
 {
@@ -35,13 +35,16 @@ class LocalConnection : Connection
         void delegate(Connection, ConnectionError) onError,
         void delegate(Connection, const Packet packet) onPacket
     ) {
+        this.handler = onPacket;
+
         if (! this.host.connect(this)) {
+            this.handler = null;
             onError(this, ConnectionError.RejectedByHost);
 
             return;
         }
 
-        this.handler = onPacket;
+        this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Connected)));
 
         onSuccess(this);
     }
@@ -54,6 +57,6 @@ class LocalConnection : Connection
      */
     public override void send(const Packet packet)
     {
-         this.host.receive(this, packet);
+        this.host.receive(this, packet);
     }
 }

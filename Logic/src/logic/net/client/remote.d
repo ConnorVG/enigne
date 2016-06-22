@@ -5,12 +5,10 @@ import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 import std.socket :
     INADDR_LOOPBACK, InternetAddress, AddressFamily, Socket, SocketType,
-    SocketOptionLevel, SocketOption, SocketShutdown, ProtocolType;
+    SocketOptionLevel, SocketOption, ProtocolType;
 
 import std.array : appender;
-import std.bitmanip : read, append;
-
-debug import std.stdio : writeln, writefln;
+import std.bitmanip : peek, append;
 
 class RemoteConnection : Connection
 {
@@ -30,9 +28,9 @@ class RemoteConnection : Connection
     protected Socket socket;
 
     /**
-     * The packet handler.
+     * The active buffer.
      */
-    protected void delegate(Connection, const Packet packet) handler;
+    protected ubyte[] buffer = [];
 
     /**
      * Construct the connection.
@@ -78,12 +76,75 @@ class RemoteConnection : Connection
             return;
         }
 
+        this.handler = onPacket;
+
         this.socket.blocking = false;
         this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Connected)));
 
-        this.handler = onPacket;
-
         onSuccess(this);
+    }
+
+    /**
+     * Process the connection.
+     */
+    public override void process()
+    {
+        do { } while (this.read());
+
+        this.parse();
+    }
+
+    /**
+     * Reads the socket.
+     *
+     * Returns: whether or not more processing might be possible
+     */
+    protected bool read()
+    {
+        auto buff = new ubyte[2048];
+        auto length = this.socket.receive(buff);
+
+        if (length <= 0) {
+            return false;
+        }
+
+        buff.length = length;
+        this.buffer = buffer ~ buff;
+
+        return length == 2048;
+    }
+
+    /**
+     * Parse the buffer.
+     */
+    protected void parse()
+    {
+        if (this.buffer.length < PacketHeader.sizeof) {
+            return;
+        }
+
+        PacketHeader header = {
+            type: this.buffer.peek!ushort(0),
+            subType: this.buffer.peek!ubyte(2),
+            length: this.buffer.peek!ushort(3),
+        };
+
+        ubyte[] content = [];
+        if (header.length != 0) {
+            if (this.buffer.length < PacketHeader.sizeof + header.length) {
+                return;
+            }
+
+            content = this.buffer[PacketHeader.sizeof..(PacketHeader.sizeof + header.length - 1)];
+        }
+
+        if (this.buffer.length == PacketHeader.sizeof + header.length) {
+            this.buffer = [];
+        } else {
+            this.buffer = this.buffer[(PacketHeader.sizeof + header.length)..(this.buffer.length - 1)];
+        }
+
+        this.receive(Packet(header, content));
     }
 
     /**

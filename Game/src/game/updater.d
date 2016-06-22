@@ -23,6 +23,8 @@ class Updater : IUpdater
      * this is just for debug fam
      */
     protected Host host;
+    protected Connection local;
+    protected Connection remote;
 
     /**
      * Set the runner.
@@ -56,16 +58,26 @@ class Updater : IUpdater
         debug writeln("Updater::onStart");
 
         this.host = new Host();
+        this.host.onPacket = &this.onHostPacket;
         this.host.start();
 
-        //import logic.net : LocalConnection;
-        //auto local = new LocalConnection(this.host);
+        import logic.net : LocalConnection;
+        this.local = new LocalConnection(this.host);
 
-        //local.connect(
-        //    &this.onSuccess,
-        //    &this.onError,
-        //    &this.onPacket
-        //);
+        this.local.connect(
+            &this.onSuccess,
+            &this.onError,
+            &this.onPacket
+        );
+
+        import logic.net : RemoteConnection;
+        this.remote = new RemoteConnection();
+
+        this.remote.connect(
+            &this.onSuccess,
+            &this.onError,
+            &this.onPacket
+        );
     }
 
     /**
@@ -79,14 +91,11 @@ class Updater : IUpdater
     {
         pool.put(task(&this.host.process));
 
-        import logic.net : RemoteConnection;
-        auto remote = new RemoteConnection();
+        // even tho this does nothing ;D
+        pool.put(task(&this.local.process));
 
-        remote.connect(
-            &this.onSuccess,
-            &this.onError,
-            &this.onPacket
-        );
+        // this is obv required
+        pool.put(task(&this.remote.process));
 
         if (! this.state) {
             return;
@@ -103,12 +112,14 @@ class Updater : IUpdater
         debug writeln("Updater::onStop");
 
         this.host.stop();
+        this.local.process();
+        this.remote.process();
     }
 
     import logic.net : Connection;
     protected void onSuccess(Connection connection)
     {
-        // connection.send(packet);
+        // connected
     }
 
     import logic.net : ConnectionError;
@@ -118,8 +129,12 @@ class Updater : IUpdater
     }
 
     import logic.net : Packet;
+    protected void onHostPacket(Connection connection, const Packet packet)
+    {
+        debug writefln("Connection[%s] -> Host:- Packet( %s )", connection, packet);
+    }
     protected void onPacket(Connection connection, const Packet packet)
     {
-        debug writeln("connection recieved packet...");
+        debug writefln("Host -> Connection[%s]:- Packet( %s )", connection, packet);
     }
 }

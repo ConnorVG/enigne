@@ -100,7 +100,7 @@ class Runner
 
                 total += updateTick;
 
-                if (total > 60 * 5) {
+                if (total > 60 * 2) {
                     this.stop();
                 }
 

@@ -1,14 +1,15 @@
 module logic.net.server.host;
 
-import logic.net.client : Connection;
-import logic.net.packet : Packet, PacketHeader;
+import logic.net.client : Connection, ConnectionError, ClientConnection;
+import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 import std.socket :
     INADDR_LOOPBACK, InternetAddress, Address, AddressFamily, Socket, SocketType,
     SocketOptionLevel, SocketOption, SocketShutdown, ProtocolType;
 
-import std.bitmanip : read, write;
+import std.bitmanip : peek, write;
 import std.algorithm : canFind;
+import std.parallelism : parallel;
 
 debug import std.stdio : writeln, writefln;
 
@@ -27,7 +28,7 @@ class Host
     /**
      * The server socket.
      */
-    protected Socket socket;
+    public Socket socket;
 
     /**
      * The active connections.
@@ -40,9 +41,34 @@ class Host
     protected ubyte[const string] map;
 
     /**
-     * The current index.
+     * The active buffers.
+     */
+    protected ubyte[][const string] buffers;
+
+    /**
+     * The current connection index.
      */
     protected ubyte index = 0;
+
+    /**
+     * The packet handler.
+     */
+    public void delegate(Connection, const Packet) onPacket;
+
+    /**
+     * The pre-connection handler.
+     */
+    public void delegate(Connection) onPreConnect;
+
+    /**
+     * The post-connection handler.
+     */
+    public void delegate(Connection) onPostConnect;
+
+    /**
+     * The disconnection handler.
+     */
+    public void delegate(Connection, ConnectionError) onDisconnect;
 
     /**
      * The connection count.
@@ -69,8 +95,6 @@ class Host
      */
     public void start()
     {
-        debug writeln("Host::start");
-
         this.connections.clear();
         this.map.clear();
 
@@ -90,35 +114,93 @@ class Host
      */
     public void process()
     {
+        do { } while (this.read());
+
+        foreach (ref identifier; parallel(this.buffers.keys)) {
+            this.parse(identifier);
+        }
+    }
+
+    /**
+     * Reads the host socket.
+     *
+     * Returns: whether or not more processing might be possible
+     */
+    protected bool read()
+    {
         Address address;
-        auto buffer = new ubyte[PacketHeader.sizeof];
+        auto buffer = new ubyte[2048];
         auto length = this.socket.receiveFrom(buffer, address);
 
         if (length <= 0) {
+            return false;
+        }
+
+        auto identifier = address.toString();
+
+        buffer.length = length;
+        if (identifier in this.buffers) {
+            buffer = this.buffers[identifier] ~ buffer;
+        }
+
+        this.buffers[identifier] = buffer;
+
+        if (identifier !in this.map) {
+            auto connection = new ClientConnection(this, address);
+
+            if (this.connections.length == ubyte.max) {
+                this.disconnect(connection);
+
+                return true;
+            }
+
+            this.connect(connection);
+
+            if (! connection.id.isNull) {
+                this.map[identifier] = connection.id;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Parse a buffer.
+     *
+     * Params:
+     *      identifier  =       the identifier to parse
+     */
+    protected void parse(const string identifier)
+    {
+        auto buffer = this.buffers[identifier];
+
+        if (buffer.length < PacketHeader.sizeof) {
             return;
         }
 
-        auto identifier = address.toAddrString();
-        if (identifier !in this.map) {
-            debug writefln("new address");
-
-            this.map[identifier] = 1;
-        }
-
-        // Todo: actual and safe buffering lol
-
         PacketHeader header = {
-            type: buffer.read!ushort(),
-            subType: buffer.read!ubyte(),
-            length: buffer.read!ushort(),
+            type: buffer.peek!ushort(0),
+            subType: buffer.peek!ubyte(2),
+            length: buffer.peek!ushort(3),
         };
 
         ubyte[] content = [];
-        if (header.length > 0) {
-            // content = ...
+        if (header.length != 0) {
+            if (buffer.length < PacketHeader.sizeof + header.length) {
+                return;
+            }
+
+            content = buffer[PacketHeader.sizeof..(PacketHeader.sizeof + header.length - 1)];
         }
 
-        debug writefln("Host::process:- PacketHeader( %d, %d, %d )", header.type, header.subType, header.length);
+        if (buffer.length == PacketHeader.sizeof + header.length) {
+            this.buffers[identifier] = [];
+        } else {
+            this.buffers[identifier] = buffer[(PacketHeader.sizeof + header.length)..(buffer.length - 1)];
+        }
+
+        this.receive(this.connections[this.map[identifier]], Packet(header, content));
+        this.parse(identifier);
     }
 
     /**
@@ -126,11 +208,35 @@ class Host
      */
     public void stop()
     {
-        debug writeln("Host::stop");
-
+        this.broadcast(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));
         this.socket.shutdown(SocketShutdown.BOTH);
         this.socket.close();
         this.socket = null;
+    }
+
+    /**
+     * Disconnect a connection.
+     *
+     * Params:
+     *      connection  =       the connection to disconnect
+     */
+    public void disconnect(Connection connection)
+    {
+        if (! connection.id.isNull) {
+            this.connections.remove(connection.id);
+        }
+
+        if (auto client = cast(ClientConnection) connection) {
+            this.map.remove(client.address.toString());
+        }
+
+        connection.receive(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));
+
+        if (! this.onDisconnect) {
+            return;
+        }
+
+        this.onDisconnect(connection, ConnectionError.None);
     }
 
     /**
@@ -156,7 +262,9 @@ class Host
         this.connections[this.index] = connection;
         connection.id = this.index;
 
-        debug writefln("Host::connect( %d )", this.index);
+        if (this.onPreConnect) {
+            this.onPreConnect(connection);
+        }
 
         return true;
     }
@@ -199,6 +307,30 @@ class Host
      */
     public void receive(Connection connection, const Packet packet)
     {
-        debug writefln("Host::receive( %d, %d, %d )", connection.id, packet.header.type, packet.header.subType);
+        if (packet.header.type == PacketType.Connection) {
+            switch (packet.header.subType) with (PacketSubType) {
+                case Connection_Connected:
+                    this.send(connection, Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Connected)));
+
+                    if (this.onPostConnect) {
+                        this.onPostConnect(connection);
+                    }
+
+                    break;
+                case Connection_Disconnected:
+                    this.disconnect(connection);
+
+                    return;
+
+                default: break;
+            }
+        }
+
+        if (! this.onPacket) {
+            return;
+        }
+
+        this.onPacket(connection, packet);
     }
 }
+
