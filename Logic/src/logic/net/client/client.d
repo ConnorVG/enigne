@@ -1,7 +1,7 @@
 module logic.net.client.client;
 
 import logic.net.server : Host;
-import logic.net.client.connection : Connection, ConnectionError;
+import logic.net.client.connection : Connection;
 import logic.net.packet : Packet;
 
 import std.socket : Address;
@@ -44,7 +44,7 @@ class ClientConnection : Connection
      */
     public override void connect(
         void delegate(Connection) onSuccess,
-        void delegate(Connection, ConnectionError) onError,
+        void delegate(Connection) onError,
         void delegate(Connection, const Packet packet) onPacket
     ) { /** */ }
 

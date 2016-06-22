@@ -64,11 +64,9 @@ class Runner
      */
     public void run()
     {
-        float updateRateBase = 1000000f / 30f;
-        //float updateRate = 1000000f / 30f;
-        float updateRate = 1000000f / 1;
-        //float renderRate = 1000000f / 144;
-        float renderRate = 1000000f / 1;
+        float updateRateBase = 1000000f / 30;
+        float updateRate = 1000000f / 30;
+        float renderRate = 1000000f / 144;
 
         int updateDelay = 0;
         int renderDelay = 0;
@@ -82,7 +80,9 @@ class Runner
 
         TaskPool taskPool;
 
-        float total = 0f;
+        debug {
+            float total = 0f;
+        }
 
         while (this.running) {
             now = MonoTime.currTime;
@@ -98,10 +98,12 @@ class Runner
                     updateTick += (updateDelay / updateRate) / updateRateBase;
                 }
 
-                total += updateTick;
+                debug {
+                    total += updateTick;
 
-                if (total > 60 * 2) {
-                    this.stop();
+                    if (total >= 5) {
+                        this.stop();
+                    }
                 }
 
                 taskPool = new TaskPool();

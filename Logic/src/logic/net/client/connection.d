@@ -7,7 +7,6 @@ import std.typecons : Nullable;
 enum ConnectionError {
     None,
     Unknown,
-    RejectedByHost,
 }
 
 abstract class Connection
@@ -32,7 +31,7 @@ abstract class Connection
      */
     public abstract void connect(
         void delegate(Connection) onSuccess,
-        void delegate(Connection, ConnectionError) onError,
+        void delegate(Connection) onError,
         void delegate(Connection, const Packet) onPacket
     );
 

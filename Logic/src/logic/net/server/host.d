@@ -41,9 +41,9 @@ class Host
     protected ubyte[const string] map;
 
     /**
-     * The active buffers.
+     * The active buffer.
      */
-    protected ubyte[][const string] buffers;
+    protected ubyte[][const string] buffer;
 
     /**
      * The current connection index.
@@ -116,7 +116,7 @@ class Host
     {
         do { } while (this.read());
 
-        foreach (ref identifier; parallel(this.buffers.keys)) {
+        foreach (ref identifier; parallel(this.buffer.keys)) {
             this.parse(identifier);
         }
     }
@@ -129,8 +129,8 @@ class Host
     protected bool read()
     {
         Address address;
-        auto buffer = new ubyte[2048];
-        auto length = this.socket.receiveFrom(buffer, address);
+        auto buff = new ubyte[2048];
+        auto length = this.socket.receiveFrom(buff, address);
 
         if (length <= 0) {
             return false;
@@ -138,12 +138,12 @@ class Host
 
         auto identifier = address.toString();
 
-        buffer.length = length;
-        if (identifier in this.buffers) {
-            buffer = this.buffers[identifier] ~ buffer;
+        buff.length = length;
+        if (identifier in this.buffer) {
+            buff = this.buffer[identifier] ~ buff;
         }
 
-        this.buffers[identifier] = buffer;
+        this.buffer[identifier] = buff;
 
         if (identifier !in this.map) {
             auto connection = new ClientConnection(this, address);
@@ -172,7 +172,7 @@ class Host
      */
     protected void parse(const string identifier)
     {
-        auto buffer = this.buffers[identifier];
+        auto buffer = this.buffer[identifier];
 
         if (buffer.length < PacketHeader.sizeof) {
             return;
@@ -190,16 +190,21 @@ class Host
                 return;
             }
 
-            content = buffer[PacketHeader.sizeof..(PacketHeader.sizeof + header.length - 1)];
+            content = buffer[PacketHeader.sizeof..(PacketHeader.sizeof + header.length)];
         }
 
         if (buffer.length == PacketHeader.sizeof + header.length) {
-            this.buffers[identifier] = [];
+            this.buffer[identifier] = [];
         } else {
-            this.buffers[identifier] = buffer[(PacketHeader.sizeof + header.length)..(buffer.length - 1)];
+            this.buffer[identifier] = buffer[(PacketHeader.sizeof + header.length)..buffer.length];
         }
 
         this.receive(this.connections[this.map[identifier]], Packet(header, content));
+
+        if (this.buffer[identifier].length < PacketHeader.sizeof) {
+            return;
+        }
+
         this.parse(identifier);
     }
 
@@ -208,10 +213,29 @@ class Host
      */
     public void stop()
     {
-        this.broadcast(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));
+        this.disconnect();
+
         this.socket.shutdown(SocketShutdown.BOTH);
         this.socket.close();
         this.socket = null;
+    }
+
+    /**
+     * Disconnect all connections.
+     */
+    public void disconnect()
+    {
+        this.broadcast(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));
+
+        if (this.onDisconnect) {
+            foreach (ref connection; parallel(this.connections.values)) {
+                this.onDisconnect(connection, ConnectionError.None);
+            }
+        }
+
+        this.connections.clear();
+        this.map.clear();
+        this.buffer.clear();
     }
 
     /**
@@ -227,7 +251,10 @@ class Host
         }
 
         if (auto client = cast(ClientConnection) connection) {
-            this.map.remove(client.address.toString());
+            auto address = client.address.toString();
+
+            this.map.remove(address);
+            this.buffer.remove(address);
         }
 
         connection.receive(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Disconnected)));

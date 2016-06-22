@@ -1,9 +1,11 @@
 module fiiight.game.updater;
 
 import fiiight.game.state : State;
-import fiiight.logic : Host, IUpdater, Runner, IState;
+import fiiight.logic : IUpdater, Runner, IState;
 
 import std.parallelism : TaskPool, task;
+
+debug import fiiight.logic : Host, Connection, ConnectionError, Packet, LocalConnection, RemoteConnection;
 
 debug import std.stdio : writeln, writefln;
 
@@ -19,12 +21,14 @@ class Updater : IUpdater
      */
     protected State state;
 
-    /**
-     * this is just for debug fam
-     */
-    protected Host host;
-    protected Connection local;
-    protected Connection remote;
+    debug {
+        /**
+         * this is just for debug fam
+         */
+        protected Host host;
+        protected Connection local;
+        protected Connection remote;
+    }
 
     /**
      * Set the runner.
@@ -57,27 +61,30 @@ class Updater : IUpdater
     {
         debug writeln("Updater::onStart");
 
-        this.host = new Host();
-        this.host.onPacket = &this.onHostPacket;
-        this.host.start();
+        debug {
+            this.host = new Host();
 
-        import logic.net : LocalConnection;
-        this.local = new LocalConnection(this.host);
+            this.host.onPacket = &this.onHostPacket;
+            this.host.onPreConnect = &this.onPreConnect;
+            this.host.onPostConnect = &this.onPostConnect;
+            this.host.onDisconnect = &this.onDisconnect;
 
-        this.local.connect(
-            &this.onSuccess,
-            &this.onError,
-            &this.onPacket
-        );
+            this.host.start();
 
-        import logic.net : RemoteConnection;
-        this.remote = new RemoteConnection();
+            this.local = new LocalConnection(this.host);
+            this.local.connect(
+                &this.onSuccess,
+                &this.onError,
+                &this.onPacket
+            );
 
-        this.remote.connect(
-            &this.onSuccess,
-            &this.onError,
-            &this.onPacket
-        );
+            this.remote = new RemoteConnection();
+            this.remote.connect(
+                &this.onSuccess,
+                &this.onError,
+                &this.onPacket
+            );
+        }
     }
 
     /**
@@ -89,19 +96,23 @@ class Updater : IUpdater
      */
     public void run(TaskPool pool, const float tick)
     {
-        pool.put(task(&this.host.process));
+        debug writefln("Updater::run( %f )", tick);
 
-        // even tho this does nothing ;D
-        pool.put(task(&this.local.process));
+        debug {
+            pool.put(task(&this.host.process));
 
-        // this is obv required
-        pool.put(task(&this.remote.process));
+            // even tho this does nothing ;D
+            pool.put(task(&this.local.process));
+
+            // this is obv required
+            pool.put(task(&this.remote.process));
+        }
 
         if (! this.state) {
             return;
         }
 
-        debug writefln("Updater::run( %f )", tick);
+        // ... update state
     }
 
     /**
@@ -111,30 +122,47 @@ class Updater : IUpdater
     {
         debug writeln("Updater::onStop");
 
-        this.host.stop();
-        this.local.process();
-        this.remote.process();
+        debug {
+            this.host.stop();
+            this.local.process();
+            this.remote.process();
+        }
     }
 
-    import logic.net : Connection;
-    protected void onSuccess(Connection connection)
-    {
-        // connected
-    }
+    debug {
+        protected void onSuccess(Connection connection)
+        {
+            writefln("Connection[%s]::onSuccess", connection);
+        }
 
-    import logic.net : ConnectionError;
-    protected void onError(Connection connection, ConnectionError error)
-    {
-        // ...
-    }
+        protected void onError(Connection connection)
+        {
+            writefln("Connection[%s]::onError", connection);
+        }
 
-    import logic.net : Packet;
-    protected void onHostPacket(Connection connection, const Packet packet)
-    {
-        debug writefln("Connection[%s] -> Host:- Packet( %s )", connection, packet);
-    }
-    protected void onPacket(Connection connection, const Packet packet)
-    {
-        debug writefln("Host -> Connection[%s]:- Packet( %s )", connection, packet);
+        protected void onPreConnect(Connection connection)
+        {
+            writefln("Connection[%s]::onPreConnect", connection);
+        }
+
+        protected void onPostConnect(Connection connection)
+        {
+            writefln("Connection[%s]::onPostConnect", connection);
+        }
+
+        protected void onDisconnect(Connection connection, ConnectionError error)
+        {
+            writefln("Connection[%s]::onDisconnect", connection);
+        }
+
+        protected void onHostPacket(Connection connection, const Packet packet)
+        {
+            writefln("Connection[%s] -> Host:- Packet( %s )", connection, packet);
+        }
+
+        protected void onPacket(Connection connection, const Packet packet)
+        {
+            writefln("Host -> Connection[%s]:- Packet( %s )", connection, packet);
+        }
     }
 }

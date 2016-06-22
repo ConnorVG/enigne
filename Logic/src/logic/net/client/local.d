@@ -1,6 +1,6 @@
 module logic.net.client.local;
 
-import logic.net.client.connection : Connection, ConnectionError;
+import logic.net.client.connection : Connection;
 import logic.net.server : Host;
 import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
@@ -32,14 +32,14 @@ class LocalConnection : Connection
      */
     public override void connect(
         void delegate(Connection) onSuccess,
-        void delegate(Connection, ConnectionError) onError,
+        void delegate(Connection) onError,
         void delegate(Connection, const Packet packet) onPacket
     ) {
         this.handler = onPacket;
 
         if (! this.host.connect(this)) {
             this.handler = null;
-            onError(this, ConnectionError.RejectedByHost);
+            onError(this);
 
             return;
         }

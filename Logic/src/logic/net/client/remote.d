@@ -1,6 +1,6 @@
 module logic.net.client.remote;
 
-import logic.net.client.connection : Connection, ConnectionError;
+import logic.net.client.connection : Connection;
 import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 import std.socket :
@@ -55,7 +55,7 @@ class RemoteConnection : Connection
      */
     public override void connect(
         void delegate(Connection) onSuccess,
-        void delegate(Connection, ConnectionError) onError,
+        void delegate(Connection) onError,
         void delegate(Connection, const Packet packet) onPacket
     ) {
         this.socket = new Socket(AddressFamily.INET, SocketType.DGRAM, ProtocolType.UDP);
@@ -71,7 +71,7 @@ class RemoteConnection : Connection
             this.socket.close();
             this.socket = null;
 
-            onError(this, ConnectionError.RejectedByHost);
+            onError(this);
 
             return;
         }
@@ -111,7 +111,7 @@ class RemoteConnection : Connection
         buff.length = length;
         this.buffer = buffer ~ buff;
 
-        return length == 2048;
+        return true;
     }
 
     /**
@@ -135,16 +135,22 @@ class RemoteConnection : Connection
                 return;
             }
 
-            content = this.buffer[PacketHeader.sizeof..(PacketHeader.sizeof + header.length - 1)];
+            content = this.buffer[PacketHeader.sizeof..(PacketHeader.sizeof + header.length)];
         }
 
         if (this.buffer.length == PacketHeader.sizeof + header.length) {
             this.buffer = [];
         } else {
-            this.buffer = this.buffer[(PacketHeader.sizeof + header.length)..(this.buffer.length - 1)];
+            this.buffer = this.buffer[(PacketHeader.sizeof + header.length)..this.buffer.length];
         }
 
         this.receive(Packet(header, content));
+
+        if (this.buffer.length < PacketHeader.sizeof) {
+            return;
+        }
+
+        this.parse();
     }
 
     /**
