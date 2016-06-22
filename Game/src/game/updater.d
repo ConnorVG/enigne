@@ -96,7 +96,7 @@ class Updater : IUpdater
      */
     public void run(TaskPool pool, const float tick)
     {
-        debug writefln("Updater::run( %f )", tick);
+        //debug writefln("Updater::run( %f )", tick);
 
         debug {
             pool.put(task(&this.host.process));
@@ -132,37 +132,37 @@ class Updater : IUpdater
     debug {
         protected void onSuccess(Connection connection)
         {
-            writefln("Connection[%s]::onSuccess", connection);
+            //writefln("Connection[%s]::onSuccess", connection);
         }
 
         protected void onError(Connection connection)
         {
-            writefln("Connection[%s]::onError", connection);
+            //writefln("Connection[%s]::onError", connection);
         }
 
         protected void onPreConnect(Connection connection)
         {
-            writefln("Connection[%s]::onPreConnect", connection);
+            //writefln("Connection[%s]::onPreConnect", connection);
         }
 
         protected void onPostConnect(Connection connection)
         {
-            writefln("Connection[%s]::onPostConnect", connection);
+            //writefln("Connection[%s]::onPostConnect", connection);
         }
 
         protected void onDisconnect(Connection connection, ConnectionError error)
         {
-            writefln("Connection[%s]::onDisconnect", connection);
+            writefln("Connection[%s]::onDisconnect [%dms]", connection, connection.ping);
         }
 
         protected void onHostPacket(Connection connection, const Packet packet)
         {
-            writefln("Connection[%s] -> Host:- Packet( %s )", connection, packet);
+            //writefln("Connection[%s] -> Host:- Packet( %s )", connection, packet);
         }
 
         protected void onPacket(Connection connection, const Packet packet)
         {
-            writefln("Host -> Connection[%s]:- Packet( %s )", connection, packet);
+            //writefln("Host -> Connection[%s]:- Packet( %s )", connection, packet);
         }
     }
 }

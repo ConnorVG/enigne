@@ -7,9 +7,13 @@ import std.socket :
     INADDR_LOOPBACK, InternetAddress, Address, AddressFamily, Socket, SocketType,
     SocketOptionLevel, SocketOption, SocketShutdown, ProtocolType;
 
+import std.uuid : UUID, sha1UUID;
+import std.string : format;
 import std.bitmanip : peek, write;
 import std.algorithm : canFind;
 import std.parallelism : parallel;
+
+import core.time : MonoTime;
 
 debug import std.stdio : writeln, writefln;
 
@@ -38,7 +42,17 @@ class Host
     /**
      * The connection map.
      */
-    protected ubyte[const string] map;
+    protected ubyte[const string] connectionsMap;
+
+    /**
+     * The connection ping-pongs.
+     */
+    protected ulong[UUID] pings;
+
+    /**
+     * The connection ping-pongs map.
+     */
+    protected UUID[ubyte] pingsMap;
 
     /**
      * The active buffer.
@@ -96,7 +110,7 @@ class Host
     public void start()
     {
         this.connections.clear();
-        this.map.clear();
+        this.connectionsMap.clear();
 
         this.socket = new Socket(AddressFamily.INET, SocketType.DGRAM, ProtocolType.UDP);
         this.socket.setOption(SocketOptionLevel.SOCKET, SocketOption.REUSEADDR, true);
@@ -118,6 +132,10 @@ class Host
 
         foreach (ref identifier; parallel(this.buffer.keys)) {
             this.parse(identifier);
+        }
+
+        foreach (ref connection; parallel(this.connections.values)) {
+            this.ping(connection);
         }
     }
 
@@ -145,7 +163,7 @@ class Host
 
         this.buffer[identifier] = buff;
 
-        if (identifier !in this.map) {
+        if (identifier !in this.connectionsMap) {
             auto connection = new ClientConnection(this, address);
 
             if (this.connections.length == ubyte.max) {
@@ -157,7 +175,7 @@ class Host
             this.connect(connection);
 
             if (! connection.id.isNull) {
-                this.map[identifier] = connection.id;
+                this.connectionsMap[identifier] = connection.id;
             }
         }
 
@@ -199,13 +217,45 @@ class Host
             this.buffer[identifier] = buffer[(PacketHeader.sizeof + header.length)..buffer.length];
         }
 
-        this.receive(this.connections[this.map[identifier]], Packet(header, content));
+        this.receive(this.connections[this.connectionsMap[identifier]], Packet(header, content));
 
         if (this.buffer[identifier].length < PacketHeader.sizeof) {
             return;
         }
 
         this.parse(identifier);
+    }
+
+    /**
+     * Ping a connection if required.
+     */
+    protected void ping(Connection connection)
+    {
+        ulong now = cast(ulong) (MonoTime.currTime.ticks() * 1000f / MonoTime.ticksPerSecond());
+
+        if (connection.id in this.pingsMap) {
+            auto uuid = this.pingsMap[connection.id];
+
+            if (uuid in this.pings) {
+                auto ping = this.pings[uuid];
+
+                if (now - ping < 1000) {
+                    return;
+                }
+
+                this.pings.remove(uuid);
+                this.pingsMap.remove(connection.id);
+            } else {
+                this.pingsMap.remove(connection.id);
+            }
+        }
+
+        auto uuid = sha1UUID("%d:%d".format(connection.id, now));
+
+        this.pings[uuid] = now;
+        this.pingsMap[connection.id] = uuid;
+
+        this.send(connection, Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Ping, uuid.data.length), uuid.data));
     }
 
     /**
@@ -234,7 +284,7 @@ class Host
         }
 
         this.connections.clear();
-        this.map.clear();
+        this.connectionsMap.clear();
         this.buffer.clear();
     }
 
@@ -253,7 +303,7 @@ class Host
         if (auto client = cast(ClientConnection) connection) {
             auto address = client.address.toString();
 
-            this.map.remove(address);
+            this.connectionsMap.remove(address);
             this.buffer.remove(address);
         }
 
@@ -348,7 +398,31 @@ class Host
                     this.disconnect(connection);
 
                     return;
+                case Connection_Ping:
+                    this.send(connection, Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Pong, packet.header.length), packet.content));
 
+                    return;
+                case Connection_Pong:
+                    if (connection.id !in this.pingsMap || packet.header.length != 16) {
+                        break;
+                    }
+
+                    auto uuid = UUID(packet.content[0..16]);
+
+                    if (this.pingsMap[connection.id] != uuid) {
+                        break;
+                    }
+
+                    auto ping = this.pings[uuid];
+
+                    this.pingsMap.remove(connection.id);
+                    this.pings.remove(uuid);
+
+                    ulong now = cast(ulong) (MonoTime.currTime.ticks() * 1000f / MonoTime.ticksPerSecond());
+
+                    connection.ping = cast(ushort) (now - ping);
+
+                    return;
                 default: break;
             }
         }

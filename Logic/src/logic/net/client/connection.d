@@ -1,6 +1,6 @@
 module logic.net.client.connection;
 
-import logic.net.packet : Packet, PacketHeader;
+import logic.net.packet : Packet, PacketHeader, PacketType, PacketSubType;
 
 import std.typecons : Nullable;
 
@@ -15,6 +15,11 @@ abstract class Connection
      * The connection identifier.
      */
     public Nullable!ubyte id;
+
+    /**
+     * The connection ping;
+     */
+    public ushort ping = 0;
 
     /**
      * The packet handler.
@@ -72,6 +77,16 @@ abstract class Connection
      */
     public void receive(const Packet packet)
     {
+        if (packet.header.type == PacketType.Connection) {
+            switch (packet.header.subType) with (PacketSubType) {
+                case Connection_Ping:
+                    this.send(Packet(PacketHeader(PacketType.Connection, PacketSubType.Connection_Pong, packet.header.length), packet.content));
+
+                    break;
+                default: break;
+            }
+        }
+
         if (! this.handler) {
             return;
         }
