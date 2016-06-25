@@ -8,11 +8,12 @@
 
 	"version": "0.0.1",
 
-	"sourcePaths": ["src"],
+    "mainSourceFile": "src/package.d",
+    "importPaths": ["src"],
 
 	"targetType": "library",
 	"targetPath": "bin",
-	
+
 	"copyright": "Copyright © 2016, Connor S. Parks",
 	"license": "proprietary"
 }

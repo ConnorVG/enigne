@@ -1,9 +1,9 @@
-module fiiight.rendering;
+//module fiiight.rendering;
 
-/**
- * Load the library.
- */
-static void Load()
-{
-    // ...
-}
+///**
+// * Load the library.
+// */
+//static void Load()
+//{
+//    // ...
+//}

@@ -3,7 +3,7 @@ module game.net_updater;
 import game.state : State;
 import game.net : Connector, LocalConnector;
 
-import fiiight.logic : IUpdater, Runner, IState, Host, Connection, ConnectionError, Packet;
+import fiiight.logic : IUpdater, Runner, IState, Connection;
 
 import std.parallelism : TaskPool, task;
 

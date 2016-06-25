@@ -8,16 +8,16 @@
 
 	"version": "0.0.1",
 
+    "mainSourceFile": "src/app.d",
 	"sourcePaths": ["src"],
 
 	"targetType": "executable",
 	"targetPath": "bin",
-	
+
 	"copyright": "Copyright © 2016, Connor S. Parks",
 	"license": "proprietary",
 
 	"dependencies": {
-		"fiiight-common": "*",
 		"fiiight-rendering": "*",
 		"fiiight-logic": "*"
 	}

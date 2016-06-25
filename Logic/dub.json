@@ -9,7 +9,6 @@
     "version": "0.0.1",
 
     "mainSourceFile": "src/package.d",
-    "sourcePaths": ["src"],
     "importPaths": ["src"],
 
     "targetType": "library",
